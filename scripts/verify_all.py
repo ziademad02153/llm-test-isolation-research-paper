@@ -19,7 +19,7 @@ def run_checks():
     project_root = Path(__file__).resolve().parent.parent
     readme_path = project_root / "README.md"
     paper_tex_path = project_root / "paper.tex"
-    paper_pdf_path = project_root / "paper.pdf"
+    paper_pdf_path = project_root / "Manuscript.pdf" if (project_root / "Manuscript.pdf").exists() else (project_root / "paper.pdf")
     paper_log_path = project_root / "paper.log"
     bib_path = project_root / "references.bib"
     summary_path = project_root / "results_2048" / "analysis_summary.json"

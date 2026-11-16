@@ -41,7 +41,7 @@ Each evaluation executes in an automated, subprocess-isolated sandbox with a 5.0
 ```text
 .
 +-- paper.tex                               # Complete Springer Nature LaTeX manuscript
-+-- paper.pdf                               # Compiled academic paper (0 overfull hboxes)
++-- Manuscript.pdf                          # Compiled academic paper (0 overfull hboxes)
 +-- references.bib                          # BibTeX bibliography with verified citations
 +-- README.md                               # Replication package documentation
 +-- data/
@@ -133,6 +133,12 @@ logit(P(Detect)) = Beta_0 + Beta_exp * Exposure + Beta_model * Model + Beta_inte
 
 ## 5. Reproduction Guide
 
+### Step 0: One-Click Comprehensive Automated Verification Audit
+
+```bash
+python scripts/verify_all.py
+```
+
 ### Step 1: Verify Task Benchmark Suite
 
 ```bash
@@ -180,4 +186,43 @@ To verify the integrity of the datasets locally, execute:
 
 ```bash
 python -c "import hashlib; print('Clean JSONL:', hashlib.sha256(open('results_2048/experiment_records.jsonl', 'rb').read()).hexdigest()); print('Clean CSV:  ', hashlib.sha256(open('results_2048/experiment_records.csv', 'rb').read()).hexdigest())"
+```
+
+---
+
+## 7. Dataset Schema and Codebook
+
+Each row in `results_2048/experiment_records.csv` and each line in `results_2048/experiment_records.jsonl` records one independent trial evaluation:
+
+| Field Name | Type | Description |
+| :--- | :--- | :--- |
+| `record_id` | String | Unique evaluation identifier (e.g., `REC_TASK_001_T0_0`) |
+| `task_id` | String | Benchmark defect identifier (`TASK_001` through `TASK_015`) |
+| `arm` | String | Factorial experimental condition (`T0`, `T1`, `T2`, `T3`) |
+| `condition` | String | Factorial label (`Spec-GPT`, `Code-GPT`, `Code-Qwen`, `Spec-Qwen`) |
+| `trial_index` | Integer | Repetition index (0 through 14 per task and condition) |
+| `model` | String | Evaluated model (`openai/gpt-oss-120b` or `qwen/qwen3.8-27b`) |
+| `code_exposure` | Boolean | True if buggy implementation was visible in prompt; False otherwise |
+| `usable_M` | Binary (0/1) | Level 1 Test Suite Usability (1 iff test suite executes and passes on clean C_ref) |
+| `detect_Y` | Binary (0/1) | Level 2 Defect Detection (1 iff usable_M = 1 and asserts fail on buggy C_fault) |
+| `redefined_target_fn` | Boolean | True if model test code redefined target function top-level declaration |
+| `num_assertions` | Integer | Total non-trivial assert statements parsed in generated test suite |
+| `ref_status` | String | Execution outcome on C_ref (`PASSED`, `FAILED_ASSERTION`, `RUNTIME_ERROR`, `SYNTAX_ERROR`) |
+| `fault_status` | String | Execution outcome on C_fault (`PASSED`, `FAILED_ASSERTION`, `RUNTIME_ERROR`, `SYNTAX_ERROR`) |
+| `token_budget` | Integer | Generation token ceiling (2048 unconstrained) |
+
+---
+
+## 8. Citation
+
+If you use this benchmark, evaluation framework, or replication data in your research, please cite:
+
+```bibtex
+@article{allam2026separating,
+  author    = {Ziad Emad Allam},
+  title     = {Separating Test Synthesis from Implementation Inspection: An Empirical Factorial Study of Oracle Validity, Code Exposure, and Test Harness Scoping in {LLM} Testing},
+  journal   = {SN Computer Science},
+  year      = {2026},
+  note      = {Under Review; Manuscript ID: SNCS-D-26-10555}
+}
 ```
