@@ -1,0 +1,527 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{cite}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{tabularx}
+\usepackage{url}
+\usepackage{hyperref}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+\makeatletter
+\def\@maketitle{%
+  \newpage
+  \null
+  \vskip 0.2em%
+  \begin{center}%
+  \let \footnote \thanks
+    {\LARGE \@title \par}%
+    \vskip 0.8em%
+    {\large
+      \lineskip .5em%
+      \begin{tabular}[t]{c}%
+        \@author
+      \end{tabular}\par}%
+  \end{center}%
+  \par
+  \vskip 0.6em}
+\makeatother
+
+\title{\textbf{Separating Test Synthesis from Implementation Inspection: An Empirical Factorial Study of Oracle Validity, Code Exposure, and Test Harness Scoping in LLM Testing}}
+
+\author{
+    \textbf{Ziad Emad Allam}\thanks{Corresponding Author: \texttt{z.e.ziad@xed.aucegypt.edu}; ORCID: \url{https://orcid.org/0009-0008-4323-791X}} \\
+    \textit{The American University in Cairo, New Cairo, Egypt}
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+\vspace{-1.2em}
+
+\begin{abstract}
+\noindent\textbf{Purpose:} To investigate the empirical effects of implementation code exposure and model substitution on LLM unit test synthesis, and evaluate how execution harness scoping influences benchmark validity. \\
+\textbf{Methods:} We conducted a $2 \times 2$ factorial experiment crossing code exposure (specification-only vs.\ code-visible) with model (\texttt{gpt-oss-120b} vs.\ \texttt{qwen3.8-27b}) across 15 algorithmic Python tasks with one seeded defect each (225 trials per condition, 900 evaluations, 2048-token budget). Suites were evaluated in an isolated sandbox under naive string concatenation and an AST-scoped clean harness isolating target functions. Cluster-level inference ($df=14$) employed paired $t$-tests, Wilcoxon tests, permutation tests, and cluster-robust logistic regression. \\
+\textbf{Results:} Under naive concatenation, code exposure appeared to degrade defect detection for \texttt{gpt-oss-120b} ($69.78\%$ to $52.89\%$), while \texttt{qwen3.8-27b} collapsed ($15.11\%$). AST analysis revealed that in 88 $T_1$ and 159 $T_3$ suites, models redefined the target function, causing execution shadowing. Under AST-scoped clean execution, this penalty was an artifact: for \texttt{gpt-oss-120b}, defect detection rose to $85.78\%$ ($+12.89$~pp vs.\ $T_0$, $p=0.0791$, $p_{\text{Holm}}=0.2374$; 8 tasks improved, 5 tied, 2 decreased). For \texttt{qwen3.8-27b}, exposure showed no detectable effect ($71.11\%$ vs.\ $70.67\%$). Under code exposure, \texttt{gpt-oss-120b} point detection exceeded \texttt{qwen3.8-27b} by $15.11$~pp ($p_{\text{uncorr}}=0.0214$, $p_{\text{Holm}}=0.0857$). \\
+\textbf{Conclusion:} The apparent code exposure penalty in our benchmark was an artifact of harness function shadowing. When properly scoped against benchmark implementations, code exposure did not degrade defect detection. Benchmark harnesses must enforce strict scoping.
+
+\vspace{0.4em}
+\noindent\textbf{Keywords:} Software testing, LLM test generation, Code exposure, Test harness scoping, Empirical software engineering.
+\end{abstract}
+
+
+\section{Introduction}
+\label{sec:intro}
+
+Automated unit test generation is fundamental to modern continuous integration and software quality assurance~\cite{fraser2011evosuite,barr2015oracle}. With recent breakthroughs in Large Language Models (LLMs) trained on source code, generative models are increasingly deployed to synthesize unit test suites from natural language docstrings and function signatures~\cite{chen2021humaneval,lemieux2023codamosa,schafer2024testpilot,alshahwan2024automated,pizzorno2025coverup}. 
+
+Despite their generative capability, practitioners face a critical methodological question regarding prompt construction: \textit{Should the test-generating model be provided with the current implementation code?} In contemporary developer tooling, automated coding assistants, and continuous integration workflows, LLMs are frequently prompted with the complete function or class under test. However, prior studies report that implementation visibility can produce confirmation bias, where synthesized test assertions mirror buggy implementation behavior rather than validating abstract specifications~\cite{huang2024measuring,konstantinou2026codingbeforetesting,zhao2026misguidance}.
+
+In this paper, we conduct an investigation of code exposure and model substitution across 900 independent evaluations spanning 15 algorithmic Python benchmark tasks under an unconstrained 2048-token completion budget. Our empirical investigation highlights a critical methodological vulnerability in automated LLM benchmarking: \textit{test harness execution shadowing}. When LLMs generate test suites, completions frequently include full or partial definitions of the function under test (either reproducing the prompted implementation or synthesizing a provisional implementation). In naive execution harnesses that concatenate implementation code with generated test code, these model-generated definitions silently overwrite reference and buggy benchmark functions at runtime.
+
+When evaluated under a naive concatenation harness, our initial experiments appeared to reproduce a substantial ``code exposure penalty'': \texttt{gpt-oss-120b} defect detection dropped from $69.78\%$ to $52.89\%$ ($-16.89$~pp), and \texttt{qwen/qwen3.8-27b} exhibited an apparent collapse to $15.11\%$ detection. However, systematic AST analysis reveals that this penalty in our evaluation was driven by function redefinition shadowing: 88 of 225 suites in $T_1$ and 159 of 225 suites in $T_3$ redefined the target function, causing suites to execute against their own copied code rather than the benchmark system under test.
+
+When evaluated under an AST-scoped clean harness that isolates test assertions and prevents function shadowing, the empirical findings shift substantially:
+\begin{enumerate}
+    \item \textbf{Code Exposure Effect:} For \texttt{gpt-oss-120b}, code exposure did not decrease defect detection; rather, detection rose from $72.89\%$ ($164/225$) to $85.78\%$ ($193/225$) ($+12.89$~pp, task-level paired $t(14) = 1.8935, p = 0.0791$, Holm-adjusted $p = 0.2374$, exact permutation $p = 0.0957, 95\%$ CI: $[-1.71, +27.49]$~pp), with 8 tasks showing improvements, 5 tied, and 2 showing declines.
+    \item \textbf{Model Substitution and Architectural Prompt Invariance:} \texttt{qwen/qwen3.8-27b} achieves $71.11\%$ ($160/225$) under specification-only prompts and $70.67\%$ ($159/225$) with code ($-0.44$~pp, $p = 0.9329$), demonstrating prompt invariance across formats. Under code exposure, \texttt{gpt-oss-120b} point performance exceeds \texttt{qwen3.8-27b} by $15.11$~pp ($85.78\%$ vs.\ $70.67\%$, uncorrected $p = 0.0214$, Holm-adjusted $p = 0.0857$).
+    \item \textbf{Methodological Audit of Benchmark Scoping:} We demonstrate that naive string concatenation in LLM test evaluation harnesses introduces synthetic execution artifacts that distort empirical conclusions.
+    \item \textbf{Open Science Replication Package:} We provide complete, reproducible datasets, scripts, task manifests, and raw traces documenting both harness architectures.
+\end{enumerate}
+
+
+\section{Related Work and Research Questions}
+\label{sec:related}
+
+\subsection{LLM-Based Unit Test Synthesis and the Oracle Problem}
+Automated unit test generation has evolved from search-based software testing toward large language models~\cite{fraser2011evosuite,lemieux2023codamosa}. While SBST tools excel at branch coverage, they face the classic test oracle problem~\cite{barr2015oracle}: generating semantic assertions that verify functional correctness without human intervention. LLMs address this challenge by leveraging pretraining on natural language and code to synthesize domain assertions~\cite{schafer2024testpilot,alshahwan2024automated,pizzorno2025coverup}. 
+
+Recent empirical work has documented vulnerabilities when generating tests with implementation visibility. Huang et al.~\cite{huang2024measuring} examined how incorrect code influences test generation, and Konstantinou et al.~\cite{konstantinou2026codingbeforetesting} investigated code-before-test ordering in agentic multi-turn environments. Zhao et al.~\cite{zhao2026misguidance} quantified a ``misguidance effect'' where tests mirror buggy behavior, proposing specification-based prompting. Our study complements their work by examining the interaction of code exposure with execution harness scoping under an unconstrained completion budget, isolating true oracle validity from harness shadowing artifacts.
+
+\subsection{Research Questions}
+We structure our empirical inquiry around four core research questions:
+\begin{itemize}
+    \item \textbf{RQ1 (Code Exposure Effect):} What is the empirical effect of exposing implementation code versus specification-only prompts on LLM defect detection under isolated execution scoping?
+    \item \textbf{RQ2 (Model Substitution Efficacy):} Can generating tests with an alternative open-weight model outperform or compensate for the primary model under code exposure?
+    \item \textbf{RQ3 (Factorial Interaction):} Does the code-exposure effect differ across model architectures on the log-odds scale?
+    \item \textbf{RQ4 (Test Harness Validity and Scoping Architecture):} How does naive string concatenation versus AST-scoped isolation impact benchmark validity, oracle usability, and defect detection rates?
+\end{itemize}
+
+
+\section{Experimental Methodology}
+\label{sec:method}
+
+\subsection{The \texorpdfstring{$2 \times 2$}{2x2} Factorial Design}
+Following empirical software engineering guidelines~\cite{kitchenham2002preliminary,wohlin2012experimentation,runeson2009guidelines}, we formulate a balanced $2 \times 2$ factorial experiment crossing two binary dimensions:
+\begin{enumerate}
+    \item \textbf{Factor 1: Code Exposure ($T$):}
+    \begin{itemize}
+        \item \textit{Specification-Only ($T=0$):} Prompt provides the function signature and natural language docstring specifying expected behavior, boundary invariants, and return types.
+        \item \textit{Code-First ($T=1$):} Prompt provides the function signature, docstring, and complete source code of the faulty implementation $C_{\text{fault}}$.
+    \end{itemize}
+    \item \textbf{Factor 2: Test-Generation Model ($D$):}
+    \begin{itemize}
+        \item \textit{Primary Model ($D=0$):} \texttt{openai/gpt-oss-120b}.
+        \item \textit{Secondary Model ($D=1$):} \texttt{qwen/qwen3.8-27b}, an open-weight model from an alternative developer family.
+    \end{itemize}
+\end{enumerate}
+This design defines four distinct treatment arms:
+\begin{itemize}
+    \item $\mathbf{T_0}$ (\textbf{Spec-GPT}): \texttt{gpt-oss-120b} prompted with specification alone.
+    \item $\mathbf{T_1}$ (\textbf{Code-GPT}): \texttt{gpt-oss-120b} prompted with specification and implementation code.
+    \item $\mathbf{T_2}$ (\textbf{Code-Qwen}): \texttt{qwen3.8-27b} prompted with specification and implementation code.
+    \item $\mathbf{T_3}$ (\textbf{Spec-Qwen}): \texttt{qwen3.8-27b} prompted with specification alone.
+\end{itemize}
+We adopt an exploratory $\pm 8$ percentage-point margin for sensitivity-oriented equivalence testing~\cite{lakens2018equivalence}.
+
+\subsection{Benchmark Task Suite: 15 Curated Logic Defects}
+Rather than relying on synthetic mutation operators (which often produce trivial or non-natural syntactic faults), we curated 15 self-contained algorithmic Python tasks (\texttt{TASK\_001} through \texttt{TASK\_015}) designed to represent common human developer logic errors (such as boundary omissions, comparison inversions, and state mishandling) across practical engineering domains~\cite{zhu2025survey,just2014defects4j}. The inclusion criteria required: (1) self-contained Python algorithmic functions without third-party dependencies, (2) unambiguous docstrings with explicit boundary specifications, (3) verified clean reference implementations $C_{\text{ref}}$, (4) subtle logic defects in $C_{\text{fault}}$ representative of human developer errors, and (5) ground-truth test suites confirming 100\% passing on $C_{\text{ref}}$ and 100\% failing on $C_{\text{fault}}$.
+The tasks span four practical software engineering domains:
+\begin{enumerate}
+    \item \textit{Parsing and Formatting:} Semver parsing, markdown table parsing, cron schedule parsing, and URL query string serialization.
+    \item \textit{Interval and Schedule Computation:} Overlapping interval merging, calendar availability slot calculation, and rate limiter token buckets.
+    \item \textit{Data Structures and Algorithms:} Matrix spiral traversal, run-length compression, LRU cache eviction, and binary tree ancestor verification.
+    \item \textit{State and Business Logic:} Financial ledger reconciliation, state machine transition validation, JSON key path expansion, and nested dictionary diffing.
+\end{enumerate}
+
+\subsection{Inference Protocol and Execution Safeguards}
+All model inference was conducted using the Groq Cloud API under standardized settings. Each experimental trial was issued as an independent, stateless REST request with a fresh prompt payload containing zero conversation history and zero multi-turn context. To mitigate sequential ordering bias, trials were executed in fully randomized order across all 900 evaluations (seed = 42). Sampling parameters were fixed to temperature $T = 0.7$, $\text{top\_p} = 1.0$, and an unconstrained output token budget ceiling of 2048 completion tokens. Provider-reported \texttt{finish\_reason} values were logged for every trial, confirming that $98.67\%$ ($888/900$) of trials finished with \texttt{stop}, and only 12 trials ($1.33\%$, 7 in $T_1$, 5 in $T_2$) reached the 2048 ceiling.
+
+Logged per-trial turnaround times averaged 1.86s in $T_0$, 2.45s in $T_1$, 12.12s in $T_2$, and 12.40s in $T_3$ (maximum 123.89s), reflecting end-to-end trial duration including API network latency and generation time. The isolated sandbox execution timeout was strictly enforced at 5.0 seconds.
+
+\subsection{Chronological Evolution and Harness Scoping Architecture}
+\label{sec:harness_arch}
+Our evaluation proceeded through two sequential phases:
+\begin{enumerate}
+    \item \textbf{Initial Naive Concatenation Phase:} Initially, synthesized tests were evaluated using standard string concatenation:
+    \begin{equation}
+        \text{Code}_{\text{exec}} = \text{Implementation} + \texttt{"\textbackslash n\textbackslash n"} + \text{Test\_Code}
+    \end{equation}
+    Upon detailed examination of trial execution traces, we discovered that in 88 of 225 completions in $T_1$ and 159 of 225 completions in $T_3$, models defined a function matching the target benchmark function name. Because Python executes module-level definitions top-to-bottom, the model's synthesized function \textit{shadowed and overwrote} the benchmark implementation ($C_{\text{ref}}$ or $C_{\text{fault}}$) in the execution namespace. In $T_1$, copying the buggy implementation overwrote $C_{\text{ref}}$, causing valid assertions to fail against the model's pasted buggy function. In $T_3$, Qwen wrote its own implementation, which overwrote $C_{\text{fault}}$, masking the injected defect.
+    \item \textbf{AST-Scoped Clean Harness Phase:} To eliminate this execution artifact, we implemented an AST-scoped clean harness. The generated test code is parsed into an Abstract Syntax Tree (AST); any top-level \texttt{FunctionDef} or \texttt{AsyncFunctionDef} matching the target benchmark function name is stripped prior to execution. The remaining test assertions and helper definitions then execute strictly against the benchmark implementation. We note that this re-evaluation decision was made post hoc upon detecting the shadowing phenomenon, without prospective preregistration.
+\end{enumerate}
+
+\paragraph{Harness Validation and Ground-Truth Integrity:}
+To confirm the validity of the clean harness, we conducted two verification checks: (1) all 15 benchmark tasks were executed with their ground-truth test suites, confirming 100\% pass on $C_{\text{ref}}$ and 100\% detection on $C_{\text{fault}}$; and (2) synthetic shadowing tests confirmed that top-level redefinitions were stripped while preserving test assertions, with runtime identity checks verifying that the invoked function object was strictly the benchmark implementation.
+
+\paragraph{Compound Treatment in Code-Visible Prompts:}
+We note an important design detail regarding prompt construction: in the code-visible prompt ($T_1, T_2$), Requirement~2 explicitly instructed models to: \textit{``Directly invoke the function under test and assert the expected outputs based strictly on the specification.''} This clause was included to guide assertions toward the specification. As a consequence, our code exposure manipulation represents a compound treatment: providing implementation code while explicitly reminding the model to assert behavior grounded in the specification.
+
+\subsection{Evaluation Tiers and Metrics}
+Evaluation proceeds across two formal tiers in an isolated subprocess sandbox with a 5.0-second timeout guard:
+\begin{enumerate}
+    \item \textbf{Level 1: Test Suite Usability ($M$):} The test suite is executed against the reference implementation $C_{\text{ref}}$. A test suite is classified as usable ($M=1$) if and only if it parses with valid Python syntax, executes without runtime exceptions, contains at least one non-trivial test assertion verified via AST parsing, and passes all assertions on $C_{\text{ref}}$. A suite is classified as unusable ($M = 0$) if it contains syntax errors, raises a runtime exception, contains zero assertions, or fails an assertion on $C_{\text{ref}}$ (the last representing a false alarm on correct reference behavior).
+    \item \textbf{Level 2: Defect Detection ($Y$):} A usable test suite is subsequently executed against the faulty implementation $C_{\text{fault}}$. A defect is detected ($Y=1$) if and only if the suite is usable ($M=1$) and fails specifically with an \texttt{AssertionError} on buggy logic:
+    \begin{equation}
+        Y = \mathbf{1}\{M=1 \land \text{Status}(C_{\text{fault}}) = \texttt{FAILED\_ASSERTION}\}
+    \end{equation}
+    To avoid crediting execution crashes as successful defect detection, only assertion failures from suites already usable on $C_{\text{ref}}$ are counted as $Y=1$. Unusable suites ($M=0$) cannot detect defects by construction ($Y \le M$).
+\end{enumerate}
+
+
+\section{Empirical Results and Analysis}
+\label{sec:results}
+
+Across the 15 tasks and 15 repetitions per condition, we collected 900 evaluation records (225 trials per condition). Table~\ref{tab:descriptive_dual} presents descriptive metrics contrasting the AST-Scoped Clean Harness with the initial Naive Concatenation Harness and the 512-token pilot.
+
+\begin{table}[ht]
+\centering
+\caption{Descriptive Evaluation Statistics Across Experimental Conditions ($N=225$ Trials per Condition, 900 Total). Primary Dataset: 2048 Tokens; Pilot Dataset: 512 Tokens.}
+\label{tab:descriptive_dual}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcccccc}
+\toprule
+\textbf{Arm} & \textbf{Condition} & \textbf{Model} & \textbf{Redef. Fn} & \textbf{Clean Usable $M$} & \textbf{Clean Detect $Y$} & \textbf{Naive Detect $Y$} & \textbf{Pilot $Y$ (512)} \\
+\midrule
+$T_0$ & Spec-Only (\texttt{Spec-GPT})   & \texttt{gpt-oss-120b} & $8/225$  & $73.33\%$ ($165/225$) & $\mathbf{72.89\%}$ ($164/225$) & $69.78\%$ ($157/225$) & $53.78\%$ ($121/225$) \\
+$T_1$ & Code-First (\texttt{Code-GPT})  & \texttt{gpt-oss-120b} & $88/225$ & $85.78\%$ ($193/225$) & $\mathbf{85.78\%}$ ($193/225$) & $52.89\%$ ($119/225$) & $21.78\%$ ($49/225$) \\
+$T_2$ & Code-First (\texttt{Code-Qwen}) & \texttt{qwen3.8-27b}  & $155/225$ & $72.89\%$ ($164/225$) & $\mathbf{70.67\%}$ ($159/225$) & $16.00\%$ ($36/225$)  & $14.22\%$ ($32/225$) \\
+$T_3$ & Spec-Only (\texttt{Spec-Qwen})  & \texttt{qwen3.8-27b}  & $159/225$ & $73.33\%$ ($165/225$) & $\mathbf{71.11\%}$ ($160/225$) & $15.11\%$ ($34/225$)  & $13.33\%$ ($30/225$) \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{RQ1: Impact of Implementation Code Exposure under Isolated Scoping}
+To evaluate RQ1, we examine the contrast between $T_0$ (\texttt{Spec-GPT}) and $T_1$ (\texttt{Code-GPT}) across the 15 task clusters under the AST-scoped clean harness.
+Under clean scoping, defect detection under specification-only prompting is $72.89\%$ ($164/225$), compared to $85.78\%$ ($193/225$) under code exposure, representing an observed point increase of $\Delta = +12.89$ percentage points ($SE = 6.81$~pp).
+
+At the task cluster level ($N=15, \text{df}=14$), a paired $t$-test indicates that this difference is not statistically significant at the conventional $\alpha = 0.05$ threshold ($t(14) = 1.8935, p = 0.0791, 95\%$ CI: $[-1.71, +27.49]$~pp; Holm-adjusted $p = 0.2374$). The exact two-sided sign-flip permutation test yields $p = 0.0957$, and the non-parametric Wilcoxon signed-rank test yields $W = 10.0$ ($p = 0.080$). A task-level cluster bootstrap with $B = 2{,}000$ resamples (seed = 42) yields a $95\%$ confidence interval of $[+1.33, +26.22]$~pp. While the parametric Student-$t$ confidence interval spans zero ($[-1.71, +27.49]$~pp), the non-parametric cluster bootstrap interval strictly excludes zero ($[+1.33, +26.22]$~pp); both intervals, however, reflect substantial estimation uncertainty given the 15-task cluster sample.
+
+\paragraph{Task Breakdown:}
+Across the 15 tasks, 8 tasks showed improved defect detection under code exposure (\texttt{TASK\_002}, \texttt{TASK\_003}, \texttt{TASK\_006}, \texttt{TASK\_008}, \texttt{TASK\_010}, \texttt{TASK\_011}, \texttt{TASK\_014}, \texttt{TASK\_015}), 5 tasks were tied (\texttt{TASK\_004}, \texttt{TASK\_005}, \texttt{TASK\_007} tied at ceiling $15/15$, \texttt{TASK\_009} tied at $7/15$, and \texttt{TASK\_012} tied at $9/15$), and 2 tasks showed decreases: \texttt{TASK\_001} ($14 \to 9$) and \texttt{TASK\_013} ($15 \to 13$).
+
+\begin{quote}
+\textbf{Answer to RQ1:} Under isolated execution scoping, we detected no negative effect from code exposure for the primary model. Defect detection exhibited a positive point estimate ($72.89\%$ vs.\ $85.78\%$, $\Delta = +12.89$~pp, paired $t(14) = 1.8935, p = 0.0791$, Holm-adjusted $p = 0.2374$, permutation $p = 0.0957$), with 8 tasks improving, 5 tied, and 2 declining.
+\end{quote}
+
+\subsection{RQ2: Efficacy of Model Substitution}
+To evaluate whether deploying an alternative open-weight model compensates for or outperforms the primary model under code exposure, we analyze the transition from $T_1$ (\texttt{Code-GPT}) to $T_2$ (\texttt{Code-Qwen}).
+Under clean scoping, \texttt{qwen3.8-27b} achieves $70.67\%$ ($159/225$) defect detection under code exposure. While substantially higher than observed under naive concatenation ($16.00\%$), it trails \texttt{gpt-oss-120b} ($85.78\%$) by $\Delta = -15.11$ percentage points ($SE = 5.84$~pp, task-level paired $t(14) = -2.5893, p_{\text{uncorr}} = 0.0214, 95\%$ CI: $[-27.63, -2.59]$~pp; Wilcoxon $W = 16.0$). After applying Holm-Bonferroni correction across the four primary contrasts, the adjusted $p$-value is $p_{\text{Holm}} = 0.0857$, placing the contrast above the nominal $\alpha = 0.05$ threshold.
+
+\begin{quote}
+\textbf{Answer to RQ2:} Model substitution did not yield superior defect detection under code exposure. In uncorrected comparisons, the primary model exceeded the alternative model by $15.11$~pp ($85.78\%$ vs.\ $70.67\%$, uncorrected $p = 0.0214$), though this difference was not statistically significant after multiplicity adjustment ($p_{\text{Holm}} = 0.0857$).
+\end{quote}
+
+\begin{table}[t]
+\centering
+\caption{Task-Level Paired Comparisons Across Matched Task Clusters under AST-Scoped Clean Harness ($N=15$ Task Clusters, $\text{df}=14$).}
+\label{tab:paired_clean}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccccr}
+\toprule
+\textbf{Comparison} & \textbf{Baseline $\rightarrow$ Focal} & \textbf{Mean Delta ($\Delta$)} & \textbf{Paired $t(14)$} & \textbf{$p$-value (uncorr. / Holm)} & \textbf{95\% Cluster CI} \\
+\midrule
+$T_1 \rightarrow T_2$ (Model under Code)    & $85.78\% \rightarrow 70.67\%$ & $-15.11$ pp & $-2.589$ & $p = 0.0214$ / $p = 0.0857$ & $[-27.63, -2.59]$ pp \\
+$T_0 \rightarrow T_1$ (Code Exposure: GPT)  & $72.89\% \rightarrow 85.78\%$ & $+12.89$ pp & $+1.893$ & $p = 0.0791$ / $p = 0.2374$ & $[-1.71, +27.49]$ pp \\
+$T_0 \rightarrow T_3$ (Model under Spec)    & $72.89\% \rightarrow 71.11\%$ & $-1.78$ pp  & $-0.317$ & $p = 0.7562$ / $p = 1.0000$ & $[-13.82, +10.26]$ pp \\
+$T_3 \rightarrow T_2$ (Code Exposure: Qwen) & $71.11\% \rightarrow 70.67\%$ & $-0.44$ pp  & $-0.086$ & $p = 0.9329$ / $p = 1.0000$ & $[-11.56, +10.67]$ pp \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{RQ3: Factorial Interaction and Model Moderation}
+To test whether the effect of code exposure differs across the two models, we fit a $2 \times 2$ factorial logistic regression model:
+\begin{equation}
+    \text{logit}(P(Y=1)) = \beta_0 + \beta_{\text{exp}} \cdot \text{Exposure} + \beta_{\text{model}} \cdot \text{Model} + \beta_{\text{inter}} \cdot (\text{Exposure} \times \text{Model})
+\end{equation}
+where $\text{Exposure} = 1$ for code-visible conditions ($T_1, T_2$) and $\text{Model} = 1$ for \texttt{qwen3.8-27b} ($T_2, T_3$). Parameter estimates with Liang-Zeger cluster-robust variance ($G=15$ clusters, Student-$t$ with $\text{df}=14$)~\cite{liang1986longitudinal} are reported in Table~\ref{tab:logistic_clean}.
+
+\begin{table}[ht]
+\centering
+\caption{Parameter Estimates for $2 \times 2$ Factorial Logistic Interaction Model with Cluster-Robust Inference under AST-Scoped Clean Harness ($N=900$, $G=15$ Clusters, $\text{df}=14$).}
+\label{tab:logistic_clean}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Parameter} & \textbf{Coeff. ($\beta$)} & \textbf{Cluster $SE_{\text{CR}}$} & \textbf{$t(14)$ ($p$-value)} & \textbf{Odds Ratio [95\% CI]} \\
+\midrule
+Intercept ($\beta_0$)                          & $+0.9890$ & $0.3513$ & $+2.815$ ($p = 0.0138$)   & $2.6885$ $[1.2655, 5.7118]$ \\
+Code Exposure within GPT ($\beta_{\text{exp}}$) & $+0.8080$ & $0.4080$ & $+1.980$ ($p = 0.0677$)   & $2.2433$ $[0.9351, 5.3817]$ \\
+Model: Qwen vs GPT at Spec ($\beta_{\text{model}}$) & $-0.0882$ & $0.2822$ & $-0.313$ ($p = 0.7592$)  & $0.9156$ $[0.5000, 1.6766]$ \\
+Interaction: Ratio of Exposure ORs ($\beta_{\text{inter}}$) & $-0.8295$ & $0.4912$ & $-1.689$ ($p = 0.1134$) & $0.4363$ $[0.1521, 1.2514]$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+The parameter estimates reveal:
+\begin{enumerate}
+    \item \textbf{Model Parity under Specification Only:} At specification-only prompts, \texttt{qwen3.8-27b} is virtually indistinguishable from \texttt{gpt-oss-120b} ($\beta_{\text{model}} = -0.0882, p = 0.7592$; task-level difference $\Delta = -1.78$~pp, $p = 0.7562$).
+    \item \textbf{Insensitivity to Code Exposure in Secondary Model:} In \texttt{qwen3.8-27b}, defect detection is $71.11\%$ without code and $70.67\%$ with code ($\Delta = -0.44$~pp, $p = 0.9329$; task-level $95\%$ CI: $[-11.56, +10.67]$~pp).
+    \item \textbf{Interaction Effect:} The interaction coefficient is negative on the log-odds scale ($\beta_{\text{inter}} = -0.8295, p = 0.1134$), reflecting that while \texttt{gpt-oss-120b} exhibits a positive point estimate ($+12.89$~pp), \texttt{qwen3.8-27b} exhibits flat performance across both prompt formats.
+\end{enumerate}
+
+\begin{quote}
+\textbf{Answer to RQ3:} The interaction model indicates positive exposure gains in the primary model ($\beta_{\text{exp}} = +0.8080, p = 0.0677$), baseline parity at specification prompts ($\beta_{\text{model}} = -0.0882, p = 0.7592$), and no discernible code exposure effect in the secondary model ($\Delta = -0.44$~pp, $p = 0.9329$).
+\end{quote}
+
+\subsection{RQ4: Test Harness Validity, Oracle Usability, and Execution Funnels}
+\label{sec:rq4_gate}
+
+To understand why naive concatenation produced an apparent degradation, we examine the execution funnel on clean reference code $C_{\text{ref}}$ across both harness architectures. Table~\ref{tab:funnel_comparison} presents the execution breakdown.
+
+\begin{table}[ht]
+\centering
+\caption{Descriptive Execution Funnel on Reference Code $C_{\text{ref}}$ ($N=225$ per Condition) Contrasting AST-Scoped Clean Harness with Naive Concatenation Harness.}
+\label{tab:funnel_comparison}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Condition \& Harness} & \textbf{Usable ($M=1$)} & \textbf{Ref-Fail Assert} & \textbf{Runtime Crash} & \textbf{Syntax Error} & \textbf{Zero Asserts} & \textbf{Cond. Detect $P(Y|M)$} \\
+\midrule
+\multicolumn{7}{l}{\textit{AST-Scoped Clean Harness (Isolated Benchmark Execution)}} \\
+$T_0$ (Spec-GPT)   & $73.33\%$ ($165$) & $24.00\%$ ($54$) & $2.22\%$ ($5$)  & $0.44\%$ ($1$)  & $0.00\%$ ($0$) & $99.39\%$ ($164/165$) \\
+$T_1$ (Code-GPT)   & $85.78\%$ ($193$) & $11.56\%$ ($26$) & $1.78\%$ ($4$)  & $0.44\%$ ($1$)  & $0.44\%$ ($1$) & $100.00\%$ ($193/193$) \\
+$T_2$ (Code-Qwen)  & $72.89\%$ ($164$) & $13.78\%$ ($31$) & $12.44\%$ ($28$) & $0.89\%$ ($2$)  & $0.00\%$ ($0$) & $96.95\%$ ($159/164$) \\
+$T_3$ (Spec-Qwen)  & $73.33\%$ ($165$) & $13.33\%$ ($30$) & $8.44\%$ ($19$)  & $4.89\%$ ($11$) & $0.00\%$ ($0$) & $96.97\%$ ($160/165$) \\
+\midrule
+\multicolumn{7}{l}{\textit{Naive Concatenation Harness (Unchecked Module Shadowing)}} \\
+$T_0$ (Spec-GPT)   & $71.56\%$ ($161$) & $24.44\%$ ($55$) & $3.56\%$ ($8$)   & $0.44\%$ ($1$)  & $0.00\%$ ($0$) & $97.52\%$ ($157/161$) \\
+$T_1$ (Code-GPT)   & $52.89\%$ ($119$) & $44.44\%$ ($100$) & $1.78\%$ ($4$)  & $0.44\%$ ($1$)  & $0.44\%$ ($1$) & $100.00\%$ ($119/119$) \\
+$T_2$ (Code-Qwen)  & $19.56\%$ ($44$)  & $67.11\%$ ($151$) & $12.44\%$ ($28$) & $0.89\%$ ($2$)  & $0.00\%$ ($0$) & $81.82\%$ ($36/44$) \\
+$T_3$ (Spec-Qwen)  & $69.78\%$ ($157$) & $16.44\%$ ($37$) & $8.89\%$ ($20$)  & $4.89\%$ ($11$) & $0.00\%$ ($0$) & $21.66\%$ ($34/157$) \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+The contrast between the two architectures provides clear empirical insight:
+\begin{enumerate}
+    \item \textbf{The $T_1$ Shadowing Artifact (Code-GPT):} In the naive concatenation harness, suites failing assertions on $C_{\text{ref}}$ doubled from $24.44\%$ ($55/225$) in $T_0$ to $44.44\%$ ($100/225$) in $T_1$. However, in 87 of those 100 cases, the completion duplicated the prompted faulty function $C_{\text{fault}}$. Because Python executes top-to-bottom, the model's pasted function overwrote $C_{\text{ref}}$. When tests designed to verify correct behavior executed against their own pasted faulty function, assertions failed, creating false alarms on reference code. When AST scoping stripped the redefined function, ref-fail assertions dropped to $11.56\%$ ($26/225$), and usability reached $85.78\%$ ($193/225$).
+    \item \textbf{The $T_3$ Masking Artifact (Spec-Qwen):} In the naive harness, \texttt{qwen3.8-27b} appeared to detect defects in only $21.66\%$ of usable suites ($34/157$). AST inspection revealed that in 159 of 225 trials, Qwen synthesized its own provisional implementation before the unit tests. When concatenated with $C_{\text{fault}}$, Qwen's implementation overwrote $C_{\text{fault}}$, causing the test suite to execute against Qwen's bug-free function and missing the defect. Under AST scoping, Qwen's conditional detection rate rose from $21.66\%$ to $96.97\%$ ($160/165$).
+    \item \textbf{The Harness Import Sensitivity Artifact:} Beyond function definition shadowing, an audit of the 56 runtime exceptions under clean scoping revealed a secondary harness artifact: 47 crashes ($83.9\%$) were triggered by \texttt{ModuleNotFoundError} (5 in $T_0$, 4 in $T_1$, 25 in $T_2$, and 13 in $T_3$). In these trials, completions generated external import statements (e.g., \texttt{from parse\_semver import parse\_semver} or \texttt{from your\_module import ...}) expecting a multi-file package rather than an isolated single-script test harness. This artifact disproportionately penalized \texttt{qwen3.8-27b} (accounting for $89.3\%$ of its $T_2$ crashes), explaining part of the observed difference between \texttt{gpt-oss-120b} and \texttt{qwen3.8-27b} under code exposure.
+\end{enumerate}
+
+\begin{quote}
+\textbf{Answer to RQ4:} Test harness scoping fundamentally dictates benchmark validity. In naive concatenation harnesses, function redefinition creates execution shadowing that artificially suppressed usability in $T_1$ by $32.89$~pp and masked defects in $T_3$ by $75.31$~pp. Under AST-scoped execution, conditional defect detection among usable suites is near $100\%$ across all conditions ($96.95\%$ to $100.00\%$).
+\end{quote}
+
+\subsection{Sensitivity Analyses: Completion Budgets and Truncation}
+\label{sec:sensitivity}
+To examine how token budget constraints interact with evaluation, we compare the primary 2048-token dataset with the 512-token pilot study ($N=900$ evaluations).
+In the 512-token pilot, code-first completions reached the token ceiling in $89.78\%$ of trials ($202/225$ in $T_1$), leading to frequent syntax errors and truncated suites, generating an apparent drop of $\Delta = -32.00$~pp ($53.78\%$ to $21.78\%$). However, because the pilot also used naive concatenation and raw test completions were not saved, its $-32$~pp drop cannot be re-evaluated under AST scoping and remains unreliable due to the conflation of truncation and potential shadowing.
+
+In the 2048-token dataset under clean scoping, evaluating the subset of non-truncated trials ($N=888$) indicates that defect detection is $72.89\%$ ($164/225$) in $T_0$ versus $86.24\%$ ($188/218$) in $T_1$ ($\Delta = +13.35$~pp), confirming that our findings are stable against residual completion truncation.
+
+
+\section{Illustrative Failure Examples}
+\label{sec:examples}
+
+The following execution traces illustrate oracle failure modes and harness redefinition artifacts.
+
+\subsection{Oracle Invalidation via Implementation Coupling}
+Under code exposure, models occasionally synthesize assertions that overfit internal implementation choices rather than verifying abstract contracts. In \texttt{TASK\_001} (semver parsing), the faulty implementation improperly parsed prerelease tags and returned \texttt{None}. In trial \texttt{TASK\_001\_T1\_Code\_Same\_R06}, \texttt{gpt-oss-120b} mirrored this limitation directly, explicitly annotating the assertion:
+\begin{center}\vspace{-0.5em}
+\small\texttt{'prerelease': None, \# current implementation cannot extract these, so it returns None}
+\vspace{-0.5em}\end{center}
+When executed against clean reference code $C_{\text{ref}}$ (which correctly extracts prerelease tags), this assertion failed with an \texttt{AssertionError}, correctly disqualifying the suite at Level 1 ($M=0$).
+
+Across the 6 unusable suites in \texttt{TASK\_001} under $T_1$ in the clean harness, detailed inspection reveals distinct failure modes: (1) trial \texttt{R06} represents genuine defect mirroring by asserting \texttt{'prerelease': None} on an input with prerelease metadata; (2) trials \texttt{R05}, \texttt{R07}, and \texttt{R10} failed due to asserting strict leading-zero rejection (\texttt{parse\_semver('01.2.3') is None}), a semver rule not enforced by the specification or reference code; (3) trial \texttt{R13} failed an assertion on \texttt{'1.2.3-alpha'}; and (4) trial \texttt{R04} raised a runtime exception (\texttt{ModuleNotFoundError} triggered by \texttt{from semver\_parser import parse\_semver}).
+
+\subsection{Arithmetic Miscalculation vs.\ Defect Coupling}
+In \texttt{TASK\_002} (interval merging), the faulty implementation used a strict inequality (\texttt{curr\_start < prev\_end}) instead of a non-strict comparison (\texttt{<=}), failing to merge contiguous intervals. As a constructed illustration of defect alignment, a model inspecting the loop may synthesize an assertion confirming contiguous separation:
+\begin{center}\vspace{-0.5em}
+\small\texttt{assert merge\_overlapping\_intervals([(1, 4), (4, 5)]) == [(1, 4), (4, 5)]}
+\vspace{-0.5em}\end{center}
+In contrast, in empirical trace \texttt{TASK\_002\_T1\_Code\_Same\_R03}, the model asserted that unsorted intervals \texttt{[(5, 7), (1, 3), (2, 4), (4, 6)]} produce \texttt{[(1, 6), (5, 7)]}, which failed on $C_{\text{ref}}$ (which correctly returns \texttt{[(1, 7)]}). Detailed inspection indicates that this represents an arithmetic miscalculation by the model on complex input rather than defect mirroring (as the buggy implementation would have returned \texttt{[(1, 4), (4, 7)]}), illustrating oracle invalidation through model calculation errors on boundary cases.
+
+\subsection{Harness Redefinition Shadowing}
+In trials \texttt{TASK\_001\_T1\_Code\_Same\_R01} and \texttt{TASK\_001\_T1\_Code\_Same\_R11}, the model completion included the full definition \texttt{def parse\_semver(version\_str): ...} reproducing the prompted buggy logic, followed by correct unit test assertions exercising prerelease parsing:
+\begin{center}\vspace{-0.5em}
+\small\texttt{assert parse\_semver('1.2.3-alpha.1+build.001')['prerelease'] == 'alpha.1'}
+\vspace{-0.5em}\end{center}
+In the naive concatenation harness, the model's pasted definition executed after $C_{\text{ref}}$, silently overwriting the clean reference implementation. Consequently, this assertion failed against the model's own pasted function, falsely branding the suite unusable ($M=0$). Under the AST-scoped clean harness, the redundant \texttt{FunctionDef} node was stripped; the assertion passed on $C_{\text{ref}}$ and successfully detected the bug on $C_{\text{fault}}$ ($M=1, Y=1$).
+
+
+\section{Actionable Implications for Software Practice}
+\label{sec:implications}
+
+\subsection{Test Harness Engineering in LLM Benchmarking}
+Our findings advise caution in the design of empirical benchmarking infrastructure for LLM code and test generation. Benchmarking pipelines must avoid naive string concatenation of benchmark systems with LLM-generated code. Benchmarks must enforce strict scoping—either by parsing completions into ASTs to eliminate redundant target definitions or by executing generated test suites in isolated module namespaces where benchmark symbols are explicitly bound.
+
+\subsection{Prompt Architecture in Automated Testing Pipelines}
+When test execution is properly isolated against the system under test, exposing implementation code does not inherently harm defect detection; in fact, for the primary model, code exposure was associated with a $+12.89$~pp point estimate increase. Nevertheless, prompt architectures should explicitly instruct models to output test logic exclusively without duplicating production code.
+
+\subsection{Model Substitution Dynamics}
+Our results show that model substitution must be evaluated under isolated scoping. While \texttt{qwen3.8-27b} appeared ineffective under naive concatenation ($15.11\%$), clean scoping revealed that it achieves robust defect detection ($71.11\%$), on par with \texttt{gpt-oss-120b} under specification prompts ($72.89\%$). Under code exposure, \texttt{gpt-oss-120b} exhibited higher point detection ($85.78\%$ vs.\ $70.67\%$).
+
+
+\section{Threats to Validity}
+\label{sec:threats}
+
+\subsection{Internal Validity}
+Internal validity concerns whether observed differences are genuinely attributed to treatments. We used randomized trial execution across all 900 evaluations, mitigating ordering confounds. However, with $G=15$ problem clusters, cluster-robust standard errors and small-sample $t$-tests ($df=14$) remain subject to finite-sample approximations~\cite{cameron2015practitioner}. All trials were executed in subprocess-isolated environments with a 5.0-second timeout guard. Logged trial turnaround times (mean 1.86s in $T_0$, 2.45s in $T_1$, 12.12s in $T_2$, 12.40s in $T_3$, max 123.89s) capture end-to-end API latency and generation duration rather than sandbox execution alone.
+
+\paragraph{Prompt Clause and Length Confounders:}
+In our code-visible prompts, Requirement~2 explicitly instructed models to assert behavior based strictly on the specification. This instruction represents a compound treatment counteracting defect mirroring. Furthermore, implementation code expanded prompt size (averaging 490.1 prompt tokens in $T_1$ vs.\ 310.9 in $T_0$), introducing a prompt length confound. We cannot rule out that context length independently influences generation quality.
+
+\paragraph{Absence of Clean Reference Arm and Post-Hoc Analysis:}
+Our design contrasted specification-only prompts against prompts containing faulty code ($C_{\text{fault}}$), without an arm providing clean reference code ($C_{\text{ref}}$). In addition, the decision to apply AST-scoped function stripping was adopted post hoc upon examining execution traces, without prospective preregistration.
+
+\subsection{Construct Validity}
+Construct validity addresses whether our metrics reflect testing efficacy. We evaluated model substitution using two specific open-weight models (\texttt{gpt-oss-120b} and \texttt{qwen3.8-27b}) that differ substantially in parameter count (120B vs.\ 27B), architecture, pretraining data, and reasoning capability; results should not be generalized to all model combinations. Defect detection was credited exclusively when a usable suite on $C_{\text{ref}}$ triggered an assertion failure on $C_{\text{fault}}$. 
+
+Crucially, in the clean harness, conditional defect detection among usable suites was near $100\%$ across all conditions ($96.95\%$ to $100.00\%$), with 3 tasks exhibiting ceiling performance in both conditions ($15/15$ in \texttt{TASK\_004}, \texttt{TASK\_005}, and \texttt{TASK\_007}) and 2 tasks tying at sub-ceiling levels ($7/15$ in \texttt{TASK\_009} and $9/15$ in \texttt{TASK\_012}). Consequently, our benchmark primarily evaluates \textit{test oracle usability} (the avoidance of false-alarm assertion failures on clean reference code) rather than subtle bug-discrimination capability. Furthermore, docstrings contained explicit boundary specifications, which may have aided specification-only prompts. The exploratory $\pm 8$~pp margin was selected post hoc.
+
+\paragraph{Harness Import Sensitivity:}
+Under the clean harness, 47 of 56 runtime crashes ($83.9\%$) were triggered by \texttt{ModuleNotFoundError} when completions attempted to import target functions from hypothetical modules (e.g., \texttt{from parse\_semver import parse\_semver}). This failure mode disproportionately penalized \texttt{qwen3.8-27b} (25 crashes in $T_2$ and 13 in $T_3$, compared to only 5 in $T_0$ and 4 in $T_1$). Consequently, part of the observed point performance deficit between \texttt{gpt-oss-120b} and \texttt{qwen3.8-27b} under code exposure ($\Delta = -15.11$~pp) is attributable to prompt namespace sensitivity rather than semantic test assertion invalidity. Quantitatively, if all \texttt{ModuleNotFoundError} crashes were resolved and converted to defect detections, $T_2$ detection would reach $184/225$ ($81.78\%$) and $T_1$ would reach $197/225$ ($87.56\%$), narrowing the gap from $15.11$~pp down to a lower bound of $5.78$~pp.
+
+\subsection{External Validity}
+External validity concerns generalizability. Our benchmark comprises 15 single-function algorithmic Python tasks with one seeded defect per task. All trials were conducted at a single sampling temperature ($T=0.7$) using Groq Cloud model snapshots at a fixed point in time. Our findings may not generalize to multi-file repositories, integration testing, or proprietary reasoning models.
+
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+In this paper, we presented a balanced $2 \times 2$ factorial empirical study (225 trials per condition, 900 evaluations across 15 problem clusters) investigating implementation code exposure, model substitution, and test execution harness scoping in LLM test generation under an unconstrained 2048-token budget.
+Our results demonstrate that the code exposure penalty observed in our initial benchmark was an artifact of naive test execution harnesses, where model-generated function redefinitions overwrite benchmark reference and faulty implementations at runtime. When evaluated under an AST-scoped clean harness that isolates test assertions from target function definitions, code exposure for \texttt{gpt-oss-120b} was associated with an increase in point defect detection ($72.89\%$ to $85.78\%$, $p = 0.0791$, Holm-adjusted $p = 0.2374$), while \texttt{qwen3.8-27b} exhibited parity across prompt formats ($71.11\%$ vs.\ $70.67\%$). Furthermore, conditional defect detection among usable suites exceeded $96\%$ across all conditions (subject to the harness import artifact noted in Section~\ref{sec:threats}). We conclude that empirical LLM benchmarking infrastructure must enforce strict execution scoping to avoid synthetic distortion.
+
+
+\section*{Declarations}
+
+\noindent\textbf{Funding:} No funding was received for conducting this study. \\
+\textbf{Conflict of Interest / Competing Interests:} The author has no relevant financial or non-financial interests to disclose. The author is affiliated with The American University in Cairo (AUC), New Cairo, Egypt; the institution had no role in study design, data collection, analysis, decision to publish, or preparation of the manuscript. \\
+\textbf{Ethics Approval / Consent:} Not applicable (no human participants or animal subjects were involved in this research). \\
+\textbf{Data and Code Availability:} All experimental artifacts, task manifests, raw evaluation records in JSONLines and CSV formats (for both the primary 2048-token experiment and the 512-token pilot study), and all reproduction scripts are provided in the accompanying replication package and supplementary materials, and will be permanently archived under a persistent Zenodo DOI upon acceptance. \\
+\textbf{Generative AI and AI-Assisted Technologies:} During the preparation of this work, the author utilized large language model assistants for drafting Python analysis scripts, verifying statistical calculations, and LaTeX layout formatting. All scripts, statistical outputs, and manuscript text were independently verified, audited, and edited by the author, who takes full responsibility for the content of the publication. \\
+\textbf{Author Contributions:} Z.E.A. conceived the study design, developed the benchmark tasks, conducted the empirical evaluations, performed the statistical analyses, and authored the manuscript.
+
+\clearpage
+\let\oldbibliography\thebibliography
+\renewcommand{\thebibliography}[1]{%
+  \oldbibliography{#1}%
+  \small
+  \setlength{\itemsep}{0.2pt}%
+  \setlength{\parskip}{0pt}%
+}
+
+\bibliographystyle{unsrt}
+\bibliography{references}
+
+\appendix
+\section{Per-Task Evaluation Breakdown Across Harness Architectures}
+\label{sec:appendix_tasks}
+
+Table~\ref{tab:task_breakdown_dual} presents the defect detection counts across all 15 problem tasks for each experimental condition under both the AST-Scoped Clean Harness and the Naive Concatenation Harness (15 trials per condition per task).
+
+\begin{table}[ht]
+\centering
+\caption{Defect Detection Frequency by Problem Task Across Experimental Conditions (15 Trials per Condition per Task) Under AST-Scoped Clean Harness and Naive Concatenation Harness.}
+\label{tab:task_breakdown_dual}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllcccccccc}
+\toprule
+& & & \multicolumn{4}{c}{\textbf{AST-Scoped Clean Harness}} & \multicolumn{4}{c}{\textbf{Naive Concatenation Harness}} \\
+\cmidrule(lr){4-7} \cmidrule(lr){8-11}
+\textbf{Task ID} & \textbf{Domain Category} & \textbf{Diff.} & \textbf{$T_0$ (Spec)} & \textbf{$T_1$ (Code)} & \textbf{$T_2$ (Q-Cd)} & \textbf{$T_3$ (Q-Sp)} & \textbf{$T_0$ (Spec)} & \textbf{$T_1$ (Code)} & \textbf{$T_2$ (Q-Cd)} & \textbf{$T_3$ (Q-Sp)} \\
+\midrule
+\texttt{TASK\_001} & Parsing/String      & Med. & $14/15$ & $9/15$  & $9/15$  & $10/15$ & $13/15$ & $7/15$  & $1/15$  & $4/15$ \\
+\texttt{TASK\_002} & Data Structures/Alg & Med. & $12/15$ & $14/15$ & $11/15$ & $14/15$ & $11/15$ & $8/15$  & $0/15$  & $1/15$ \\
+\texttt{TASK\_003} & Math/Networking     & Easy & $11/15$ & $14/15$ & $11/15$ & $15/15$ & $11/15$ & $13/15$ & $10/15$ & $8/15$ \\
+\texttt{TASK\_004} & Data Structures     & Med. & $15/15$ & $15/15$ & $15/15$ & $11/15$ & $14/15$ & $8/15$  & $1/15$  & $2/15$ \\
+\texttt{TASK\_005} & Parsing/Stack       & Easy & $15/15$ & $15/15$ & $13/15$ & $13/15$ & $15/15$ & $13/15$ & $8/15$  & $1/15$ \\
+\texttt{TASK\_006} & Parsing/String      & Med. & $5/15$  & $13/15$ & $3/15$  & $6/15$  & $5/15$  & $7/15$  & $0/15$  & $0/15$ \\
+\texttt{TASK\_007} & Algorithms/Graphs   & Hard & $15/15$ & $15/15$ & $11/15$ & $15/15$ & $13/15$ & $10/15$ & $3/15$  & $8/15$ \\
+\texttt{TASK\_008} & State/Algorithms    & Med. & $6/15$  & $12/15$ & $11/15$ & $11/15$ & $6/15$  & $4/15$  & $0/15$  & $0/15$ \\
+\texttt{TASK\_009} & Parsing/String      & Hard & $7/15$  & $7/15$  & $10/15$ & $5/15$  & $7/15$  & $2/15$  & $0/15$  & $0/15$ \\
+\texttt{TASK\_010} & Data Structures     & Med. & $13/15$ & $15/15$ & $11/15$ & $9/15$  & $12/15$ & $10/15$ & $1/15$  & $0/15$ \\
+\texttt{TASK\_011} & Algorithms/Math     & Easy & $3/15$  & $14/15$ & $8/15$  & $6/15$  & $3/15$  & $8/15$  & $0/15$  & $1/15$ \\
+\texttt{TASK\_012} & Scheduling          & Med. & $9/15$  & $9/15$  & $13/15$ & $12/15$ & $9/15$  & $7/15$  & $0/15$  & $0/15$ \\
+\texttt{TASK\_013} & Algorithms/Arrays   & Med. & $15/15$ & $13/15$ & $10/15$ & $13/15$ & $14/15$ & $5/15$  & $1/15$  & $3/15$ \\
+\texttt{TASK\_014} & Parsing/Text        & Med. & $11/15$ & $13/15$ & $11/15$ & $12/15$ & $11/15$ & $3/15$  & $0/15$  & $1/15$ \\
+\texttt{TASK\_015} & Dynamic Programming & Med. & $13/15$ & $15/15$ & $12/15$ & $8/15$  & $13/15$ & $14/15$ & $11/15$ & $5/15$ \\
+\midrule
+\textbf{Total}     & \textbf{15 Tasks}   & —    & $\mathbf{164/225}$ & $\mathbf{193/225}$ & $\mathbf{159/225}$ & $\mathbf{160/225}$ & $\mathbf{157/225}$ & $\mathbf{119/225}$ & $\mathbf{36/225}$ & $\mathbf{34/225}$ \\
+\textbf{Rate}      & —                   & —    & $\mathbf{72.89\%}$ & $\mathbf{85.78\%}$ & $\mathbf{70.67\%}$ & $\mathbf{71.11\%}$ & $\mathbf{69.78\%}$ & $\mathbf{52.89\%}$ & $\mathbf{16.00\%}$ & $\mathbf{15.11\%}$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\section{Prompt Templates and API Configuration}
+\label{sec:appendix_prompts}
+
+The experimental evaluations were executed using the Groq Cloud API in November 2026. The sampling parameters were fixed to:
+\begin{itemize}
+    \item \textbf{Temperature:} $0.7$
+    \item \textbf{Top-p:} $1.0$
+    \item \textbf{Max Completion Tokens:} $2048$ (Primary study) / $512$ (Pilot study)
+    \item \textbf{System Message:} None (zero multi-turn context)
+\end{itemize}
+
+\subsection{\texorpdfstring{Specification-Only Prompt Template ($T_0, T_3$)}{Specification-Only Prompt Template (T0, T3)}}
+The exact prompt template employed in \texttt{src/runner.py} is:
+{\small
+\begin{verbatim}
+You are an expert software testing engineer.
+Write a concise suite of unit tests for the following Python
+function specification.
+
+Function Signature:
+{signature}
+
+Specification:
+"""
+{docstring}
+"""
+
+Requirements:
+1. Write 3 to 6 concise, targeted test assertions or test
+   functions checking typical behavior and boundary conditions.
+2. Directly invoke the function under test and assert the
+   expected outputs.
+3. Use plain Python `assert` statements
+   (e.g. `assert function_name(arg) == expected`).
+4. Output ONLY clean, executable Python code wrapped in a
+   ```python ... ``` block. Do not include markdown commentary.
+\end{verbatim}
+}
+
+\subsection{\texorpdfstring{Code-First Prompt Template ($T_1, T_2$)}{Code-First Prompt Template (T1, T2)}}
+The exact prompt template employed in \texttt{src/runner.py} is:
+{\small
+\begin{verbatim}
+You are an expert software testing engineer.
+You are given a Python function specification AND its current
+implementation. Write a concise suite of unit tests to verify
+the correctness of the function.
+
+Function Signature:
+{signature}
+
+Specification:
+"""
+{docstring}
+"""
+
+Current Implementation:
+```python
+{implementation}
+```
+
+Requirements:
+1. Write 3 to 6 concise, targeted test assertions or test
+   functions checking typical behavior and boundary conditions.
+2. Directly invoke the function under test and assert the
+   expected outputs based strictly on the specification.
+3. Use plain Python `assert` statements
+   (e.g. `assert function_name(arg) == expected`).
+4. Output ONLY clean, executable Python code wrapped in a
+   ```python ... ``` block. Do not include markdown commentary.
+\end{verbatim}
+}
+
+\end{document}

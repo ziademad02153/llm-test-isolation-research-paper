@@ -1,0 +1,14 @@
+{
+  "problem_id": "TASK_001",
+  "function_name": "parse_semver",
+  "signature": "def parse_semver(version_str: str) -> Optional[Dict[str, Any]]:",
+  "docstring": "Parse a Semantic Versioning 2.0.0 string into components.\nReturns a dict with keys: 'major' (int), 'minor' (int), 'patch' (int), 'prerelease' (Optional[str]), 'build' (Optional[str]).\nReturns None if the string is not a valid semver format (must have major.minor.patch as non-negative ints without leading zeroes).\nExample: '1.2.3-alpha.1+build.001' -> {'major': 1, 'minor': 2, 'patch': 3, 'prerelease': 'alpha.1', 'build': 'build.001'}",
+  "ref_implementation": "from typing import Optional, Dict, Any\nimport re\n\ndef parse_semver(version_str: str) -> Optional[Dict[str, Any]]:\n    if not isinstance(version_str, str) or not version_str.strip():\n        return None\n    pattern = r'^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$'\n    match = re.match(pattern, version_str.strip())\n    if not match:\n        return None\n    major, minor, patch, prerelease, build = match.groups()\n    return {\n        'major': int(major),\n        'minor': int(minor),\n        'patch': int(patch),\n        'prerelease': prerelease if prerelease is not None else None,\n        'build': build if build is not None else None\n    }\n",
+  "golden_test": "def test_parse_semver():\n    res1 = parse_semver('1.2.3')\n    assert res1 == {'major': 1, 'minor': 2, 'patch': 3, 'prerelease': None, 'build': None}\n    res2 = parse_semver('0.10.4-rc.1+20261112')\n    assert res2 == {'major': 0, 'minor': 10, 'patch': 4, 'prerelease': 'rc.1', 'build': '20261112'}\n    assert parse_semver('01.2.3') is None\n    assert parse_semver('1.2') is None\n    assert parse_semver('v1.2.3') is None\n    assert parse_semver('') is None\n\ntest_parse_semver()\n",
+  "category": "Parsing/String",
+  "difficulty": "Medium",
+  "faulty_implementation": "from typing import Optional, Dict, Any\n\ndef parse_semver(version_str: str) -> Optional[Dict[str, Any]]:\n    # Natural defect: Naive split on dots without validating leading zeroes or prerelease/build markers\n    if not isinstance(version_str, str) or not version_str.strip():\n        return None\n    parts = version_str.strip().split('.')\n    if len(parts) != 3:\n        return None\n    try:\n        return {\n            'major': int(parts[0]),\n            'minor': int(parts[1]),\n            'patch': int(parts[2]),\n            'prerelease': None,\n            'build': None\n        }\n    except ValueError:\n        return None\n",
+  "fault_type": "Boundary/Regex - Drops prerelease and build tags, accepts invalid leading zeroes",
+  "fault_generating_model": "Natural_Coder_Defect",
+  "metadata": {}
+}

@@ -1,0 +1,14 @@
+{
+  "problem_id": "TASK_009",
+  "function_name": "parse_csv_line_with_quotes",
+  "signature": "def parse_csv_line_with_quotes(line: str, delimiter: str = ',') -> List[str]:",
+  "docstring": "Parse a single CSV row supporting double-quote escaping and embedded delimiters.\nRules:\n- Fields separated by delimiter.\n- Fields enclosed in double quotes can contain the delimiter and escaped quotes (represented as '\"\"').\n- Enclosing quotes are stripped from the resulting field.\n- Returns list of field strings with whitespace preserved.\nExample: '1,\"Smith, John\",\"\"\"Hero\"\"\"' -> ['1', 'Smith, John', '\"Hero\"']",
+  "ref_implementation": "from typing import List\n\ndef parse_csv_line_with_quotes(line: str, delimiter: str = ',') -> List[str]:\n    fields = []\n    current = []\n    in_quotes = False\n    i = 0\n    n = len(line)\n    while i < n:\n        c = line[i]\n        if c == '\"':\n            if in_quotes and i + 1 < n and line[i + 1] == '\"':\n                current.append('\"')\n                i += 1\n            else:\n                in_quotes = not in_quotes\n        elif c == delimiter and not in_quotes:\n            fields.append(''.join(current))\n            current = []\n        else:\n            current.append(c)\n        i += 1\n    fields.append(''.join(current))\n    return fields\n",
+  "golden_test": "def test_csv():\n    assert parse_csv_line_with_quotes('a,b,c') == ['a', 'b', 'c']\n    assert parse_csv_line_with_quotes('1,\"Smith, John\",active') == ['1', 'Smith, John', 'active']\n    assert parse_csv_line_with_quotes('quote,\"He said \\\"\\\"hello\\\"\\\"\",end') == ['quote', 'He said \"hello\"', 'end']\n    assert parse_csv_line_with_quotes('') == ['']\n    assert parse_csv_line_with_quotes('one|two|three', delimiter='|') == ['one', 'two', 'three']\n\ntest_csv()\n",
+  "category": "Parsing/String",
+  "difficulty": "Hard",
+  "faulty_implementation": "from typing import List\n\ndef parse_csv_line_with_quotes(line: str, delimiter: str = ',') -> List[str]:\n    # Natural defect: Naive split on delimiter, completely failing to handle quoted commas\n    return [f.strip('\"') for f in line.split(delimiter)]\n",
+  "fault_type": "Delimiter Blindness - Fails to protect delimiters inside quoted strings",
+  "fault_generating_model": "Natural_Coder_Defect",
+  "metadata": {}
+}

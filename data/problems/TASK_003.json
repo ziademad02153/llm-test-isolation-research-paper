@@ -1,0 +1,14 @@
+{
+  "problem_id": "TASK_003",
+  "function_name": "calculate_exponential_backoff",
+  "signature": "def calculate_exponential_backoff(attempt: int, base_delay: float, max_delay: float, factor: float = 2.0) -> float:",
+  "docstring": "Calculate the deterministic exponential backoff delay for a given retry attempt.\nArgs:\n    attempt: 0-indexed attempt count (0, 1, 2, ...). If attempt < 0, treated as 0.\n    base_delay: Initial delay in seconds (must be >= 0.0).\n    max_delay: Maximum capped delay in seconds (must be >= base_delay).\n    factor: Multiplier per attempt (default 2.0).\nFormula: min(max_delay, base_delay * (factor ** attempt)).\nReturns:\n    The delay clamped between base_delay and max_delay. If base_delay <= 0, returns 0.0.",
+  "ref_implementation": "def calculate_exponential_backoff(attempt: int, base_delay: float, max_delay: float, factor: float = 2.0) -> float:\n    if base_delay <= 0.0:\n        return 0.0\n    att = max(0, attempt)\n    delay = base_delay * (factor ** att)\n    return max(base_delay, min(max_delay, delay))\n",
+  "golden_test": "def test_backoff():\n    assert calculate_exponential_backoff(0, 1.0, 10.0) == 1.0\n    assert calculate_exponential_backoff(1, 1.0, 10.0) == 2.0\n    assert calculate_exponential_backoff(2, 1.0, 10.0) == 4.0\n    assert calculate_exponential_backoff(3, 1.0, 10.0) == 8.0\n    assert calculate_exponential_backoff(4, 1.0, 10.0) == 10.0\n    assert calculate_exponential_backoff(-1, 1.0, 10.0) == 1.0\n    assert calculate_exponential_backoff(5, 0.0, 10.0) == 0.0\n\ntest_backoff()\n",
+  "category": "Math/Networking",
+  "difficulty": "Easy",
+  "faulty_implementation": "def calculate_exponential_backoff(attempt: int, base_delay: float, max_delay: float, factor: float = 2.0) -> float:\n    # Natural defect: 1-indexed exponent assumption (factor ** (attempt + 1)), causing premature spike\n    if base_delay <= 0.0:\n        return 0.0\n    att = max(0, attempt)\n    delay = base_delay * (factor ** (att + 1))\n    return min(max_delay, delay)\n",
+  "fault_type": "Index/Exponent shift - Attempt 0 yields base_delay * 2 instead of base_delay",
+  "fault_generating_model": "Natural_Coder_Defect",
+  "metadata": {}
+}

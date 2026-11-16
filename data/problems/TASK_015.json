@@ -1,0 +1,14 @@
+{
+  "problem_id": "TASK_015",
+  "function_name": "compute_levenshtein_distance",
+  "signature": "def compute_levenshtein_distance(s1: str, s2: str) -> int:",
+  "docstring": "Compute the minimum Levenshtein edit distance between two strings s1 and s2.\nAllowed operations (each with cost 1): insertion, deletion, substitution.\nReturns integer edit distance (0 if s1 == s2).",
+  "ref_implementation": "def compute_levenshtein_distance(s1: str, s2: str) -> int:\n    m, n = len(s1), len(s2)\n    dp = [[0] * (n + 1) for _ in range(m + 1)]\n    for i in range(m + 1):\n        dp[i][0] = i\n    for j in range(n + 1):\n        dp[0][j] = j\n        \n    for i in range(1, m + 1):\n        for j in range(1, n + 1):\n            if s1[i - 1] == s2[j - 1]:\n                dp[i][j] = dp[i - 1][j - 1]\n            else:\n                dp[i][j] = 1 + min(dp[i - 1][j],      # deletion\n                                   dp[i][j - 1],      # insertion\n                                   dp[i - 1][j - 1])  # substitution\n    return dp[m][n]\n",
+  "golden_test": "def test_levenshtein():\n    assert compute_levenshtein_distance('', '') == 0\n    assert compute_levenshtein_distance('kitten', 'sitting') == 3\n    assert compute_levenshtein_distance('flaw', 'lawn') == 2\n    assert compute_levenshtein_distance('same', 'same') == 0\n    assert compute_levenshtein_distance('a', '') == 1\n\ntest_levenshtein()\n",
+  "category": "Algorithms/Dynamic Programming",
+  "difficulty": "Medium",
+  "faulty_implementation": "def compute_levenshtein_distance(s1: str, s2: str) -> int:\n    # Natural defect: Always adds substitution cost 1 even when characters match (ignores s1[i-1] == s2[j-1])\n    m, n = len(s1), len(s2)\n    dp = [[0] * (n + 1) for _ in range(m + 1)]\n    for i in range(m + 1):\n        dp[i][0] = i\n    for j in range(n + 1):\n        dp[0][j] = j\n    for i in range(1, m + 1):\n        for j in range(1, n + 1):\n            dp[i][j] = 1 + min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])\n    return dp[m][n]\n",
+  "fault_type": "Recurrence Invariant Broken - Unconditionally increments substitution cost",
+  "fault_generating_model": "Natural_Coder_Defect",
+  "metadata": {}
+}

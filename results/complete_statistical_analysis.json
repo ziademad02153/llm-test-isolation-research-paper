@@ -1,0 +1,282 @@
+{
+  "descriptive": {
+    "T0_Spec_Same": {
+      "n_total": 225,
+      "n_usable": 158,
+      "usable_pct": 70.22222222222221,
+      "n_detect": 121,
+      "detect_pct": 53.77777777777778,
+      "cond_detect_pct": 76.58227848101265
+    },
+    "T1_Code_Same": {
+      "n_total": 225,
+      "n_usable": 109,
+      "usable_pct": 48.44444444444444,
+      "n_detect": 49,
+      "detect_pct": 21.777777777777775,
+      "cond_detect_pct": 44.95412844036697
+    },
+    "T2_Code_Cross": {
+      "n_total": 225,
+      "n_usable": 59,
+      "usable_pct": 26.222222222222225,
+      "n_detect": 32,
+      "detect_pct": 14.222222222222221,
+      "cond_detect_pct": 54.23728813559322
+    },
+    "T3_Spec_Cross": {
+      "n_total": 225,
+      "n_usable": 161,
+      "usable_pct": 71.55555555555554,
+      "n_detect": 30,
+      "detect_pct": 13.333333333333334,
+      "cond_detect_pct": 18.633540372670808
+    }
+  },
+  "paired": {
+    "T0_vs_T1": {
+      "description": "Code Exposure under Same Model",
+      "c_ref": "T0_Spec_Same",
+      "c_focal": "T1_Code_Same",
+      "n_pairs": 225,
+      "ref_successes": 121,
+      "focal_successes": 49,
+      "ref_rate": 53.77777777777778,
+      "focal_rate": 21.777777777777775,
+      "delta_pp": -32.0,
+      "mcnemar": {
+        "n_total": 225,
+        "a_both_detect": 36,
+        "b_armA_only": 85,
+        "c_armB_only": 13,
+        "d_both_miss": 91,
+        "discordant_pairs": 98,
+        "statistic": 13.0,
+        "p_value": 3.9846743192350404e-14,
+        "p_value_exact_binomial": 3.9846743192350404e-14,
+        "p_value_edwards_chi2": 7.386509801077946e-13,
+        "chi2_statistic": 51.4388,
+        "method": "Exact two-sided McNemar test",
+        "odds_ratio": 6.538,
+        "ci_95": [
+          3.647,
+          11.721
+        ],
+        "arm_a_detection_rate": 0.5378,
+        "arm_b_detection_rate": 0.2178
+      },
+      "tost": {
+        "n": 225,
+        "diff_proportions": 0.32,
+        "margin": 0.08,
+        "se_diff": 0.0385,
+        "z1": 10.3951,
+        "z2": -6.237,
+        "p_tost": 1.0,
+        "is_equivalent": false,
+        "ci_tost_90": [
+          0.2567,
+          0.3833
+        ]
+      }
+    },
+    "T1_vs_T2": {
+      "description": "Model Diversity under Code Exposure",
+      "c_ref": "T1_Code_Same",
+      "c_focal": "T2_Code_Cross",
+      "n_pairs": 225,
+      "ref_successes": 49,
+      "focal_successes": 32,
+      "ref_rate": 21.777777777777775,
+      "focal_rate": 14.222222222222221,
+      "delta_pp": -7.555555555555555,
+      "mcnemar": {
+        "n_total": 225,
+        "a_both_detect": 21,
+        "b_armA_only": 28,
+        "c_armB_only": 11,
+        "d_both_miss": 165,
+        "discordant_pairs": 39,
+        "statistic": 11.0,
+        "p_value": 0.009475304279476404,
+        "p_value_exact_binomial": 0.009475304279476404,
+        "p_value_edwards_chi2": 0.01040561986887359,
+        "chi2_statistic": 6.5641,
+        "method": "Exact two-sided McNemar test",
+        "odds_ratio": 2.545,
+        "ci_95": [
+          1.267,
+          5.113
+        ],
+        "arm_a_detection_rate": 0.2178,
+        "arm_b_detection_rate": 0.1422
+      },
+      "tost": {
+        "n": 225,
+        "diff_proportions": 0.0756,
+        "margin": 0.08,
+        "se_diff": 0.0273,
+        "z1": 5.6991,
+        "z2": 0.1628,
+        "p_tost": 0.43533,
+        "is_equivalent": false,
+        "ci_tost_90": [
+          0.0307,
+          0.1205
+        ]
+      }
+    },
+    "T0_vs_T3": {
+      "description": "Model Diversity under Spec Only",
+      "c_ref": "T0_Spec_Same",
+      "c_focal": "T3_Spec_Cross",
+      "n_pairs": 225,
+      "ref_successes": 121,
+      "focal_successes": 30,
+      "ref_rate": 53.77777777777778,
+      "focal_rate": 13.333333333333334,
+      "delta_pp": -40.44444444444444,
+      "mcnemar": {
+        "n_total": 225,
+        "a_both_detect": 17,
+        "b_armA_only": 104,
+        "c_armB_only": 13,
+        "d_both_miss": 91,
+        "discordant_pairs": 117,
+        "statistic": 13.0,
+        "p_value": 8.490021806129157e-19,
+        "p_value_exact_binomial": 8.490021806129157e-19,
+        "p_value_edwards_chi2": 8.759083709263231e-17,
+        "chi2_statistic": 69.2308,
+        "method": "Exact two-sided McNemar test",
+        "odds_ratio": 8.0,
+        "ci_95": [
+          4.495,
+          14.24
+        ],
+        "arm_a_detection_rate": 0.5378,
+        "arm_b_detection_rate": 0.1333
+      },
+      "tost": {
+        "n": 225,
+        "diff_proportions": 0.4044,
+        "margin": 0.08,
+        "se_diff": 0.0398,
+        "z1": 12.1717,
+        "z2": -8.1517,
+        "p_tost": 1.0,
+        "is_equivalent": false,
+        "ci_tost_90": [
+          0.339,
+          0.4699
+        ]
+      }
+    },
+    "T3_vs_T2": {
+      "description": "Code Exposure under Cross Model",
+      "c_ref": "T3_Spec_Cross",
+      "c_focal": "T2_Code_Cross",
+      "n_pairs": 225,
+      "ref_successes": 30,
+      "focal_successes": 32,
+      "ref_rate": 13.333333333333334,
+      "focal_rate": 14.222222222222221,
+      "delta_pp": 0.8888888888888888,
+      "mcnemar": {
+        "n_total": 225,
+        "a_both_detect": 10,
+        "b_armA_only": 20,
+        "c_armB_only": 22,
+        "d_both_miss": 173,
+        "discordant_pairs": 42,
+        "statistic": 20.0,
+        "p_value": 0.8776143287523155,
+        "p_value_exact_binomial": 0.8776143287523155,
+        "p_value_edwards_chi2": 0.8773705560641434,
+        "chi2_statistic": 0.0238,
+        "method": "Exact two-sided McNemar test",
+        "odds_ratio": 0.909,
+        "ci_95": [
+          0.496,
+          1.666
+        ],
+        "arm_a_detection_rate": 0.1333,
+        "arm_b_detection_rate": 0.1422
+      },
+      "tost": {
+        "n": 225,
+        "diff_proportions": -0.0089,
+        "margin": 0.08,
+        "se_diff": 0.0288,
+        "z1": 2.4694,
+        "z2": 3.0867,
+        "p_tost": 0.00677,
+        "is_equivalent": true,
+        "ci_tost_90": [
+          -0.0563,
+          0.0385
+        ]
+      }
+    }
+  },
+  "logistic_model": {
+    "n": 900,
+    "coefficients": {
+      "Intercept": {
+        "coef": 0.1514,
+        "se": 0.1337,
+        "z": 1.132,
+        "p_value": 0.25753,
+        "odds_ratio": 1.1635,
+        "ci_95": [
+          0.8952,
+          1.5121
+        ]
+      },
+      "Code_Exposure": {
+        "coef": -1.4301,
+        "se": 0.2097,
+        "z": -6.82,
+        "p_value": 0.0,
+        "odds_ratio": 0.2393,
+        "ci_95": [
+          0.1586,
+          0.3609
+        ]
+      },
+      "Model_Diversity": {
+        "coef": -2.0232,
+        "se": 0.2374,
+        "z": -8.524,
+        "p_value": 0.0,
+        "odds_ratio": 0.1322,
+        "ci_95": [
+          0.083,
+          0.2106
+        ]
+      },
+      "Exposure_x_Diversity": {
+        "coef": 1.5049,
+        "se": 0.3448,
+        "z": 4.365,
+        "p_value": 1e-05,
+        "odds_ratio": 4.5038,
+        "ci_95": [
+          2.2914,
+          8.8521
+        ]
+      }
+    }
+  },
+  "causal_mediation": {
+    "p_usable_given_spec": 0.7022,
+    "p_usable_given_code": 0.4844,
+    "delta_usability": -0.2178,
+    "e_y_t1": 0.2178,
+    "e_y_t0": 0.5378,
+    "total_effect": -0.32,
+    "natural_direct_effect": -0.2221,
+    "acme_indirect_effect": -0.0979,
+    "proportion_mediated_pct": 30.59
+  }
+}

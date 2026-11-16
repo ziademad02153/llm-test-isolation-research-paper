@@ -1,0 +1,14 @@
+{
+  "problem_id": "TASK_004",
+  "function_name": "flatten_nested_dict",
+  "signature": "def flatten_nested_dict(d: Dict[str, Any], sep: str = '.') -> Dict[str, Any]:",
+  "docstring": "Flatten a hierarchically nested dictionary into a single-level dictionary with compound keys.\nArgs:\n    d: The input dictionary.\n    sep: Separator string for joining nested keys (default '.').\nReturns:\n    A new flattened dictionary where nested keys are joined by sep.\n    Empty dictionaries at leaf nodes are preserved as empty dicts.\nExample: {'a': {'b': 1, 'c': {'d': 2}}, 'e': 3} -> {'a.b': 1, 'a.c.d': 2, 'e': 3}",
+  "ref_implementation": "from typing import Dict, Any\n\ndef flatten_nested_dict(d: Dict[str, Any], sep: str = '.') -> Dict[str, Any]:\n    items = {}\n    def _flatten(current: Any, parent_key: str):\n        if isinstance(current, dict) and current:\n            for k, v in current.items():\n                new_key = f\"{parent_key}{sep}{k}\" if parent_key else str(k)\n                _flatten(v, new_key)\n        else:\n            if parent_key:\n                items[parent_key] = current\n    _flatten(d, '')\n    return items\n",
+  "golden_test": "def test_flatten():\n    assert flatten_nested_dict({}) == {}\n    assert flatten_nested_dict({'a': 1, 'b': 2}) == {'a': 1, 'b': 2}\n    nested = {'a': {'b': 1, 'c': {'d': 2}}, 'e': 3}\n    assert flatten_nested_dict(nested) == {'a.b': 1, 'a.c.d': 2, 'e': 3}\n    custom_sep = {'db': {'host': 'localhost', 'port': 5432}}\n    assert flatten_nested_dict(custom_sep, sep='__') == {'db__host': 'localhost', 'db__port': 5432}\n    empty_leaf = {'a': {}}\n    assert flatten_nested_dict(empty_leaf) == {'a': {}}\n\ntest_flatten()\n",
+  "category": "Data Structures",
+  "difficulty": "Medium",
+  "faulty_implementation": "from typing import Dict, Any\n\ndef flatten_nested_dict(d: Dict[str, Any], sep: str = '.') -> Dict[str, Any]:\n    # Natural defect: Fails to preserve empty leaf dicts, discarding them completely\n    items = {}\n    def _flatten(current: Any, parent_key: str):\n        if isinstance(current, dict):\n            for k, v in current.items():\n                new_key = f\"{parent_key}{sep}{k}\" if parent_key else str(k)\n                _flatten(v, new_key)\n        else:\n            items[parent_key] = current\n    _flatten(d, '')\n    return items\n",
+  "fault_type": "Missing Base Case - Silently drops empty dict leaf values",
+  "fault_generating_model": "Natural_Coder_Defect",
+  "metadata": {}
+}

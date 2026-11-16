@@ -1,0 +1,14 @@
+{
+  "problem_id": "TASK_011",
+  "function_name": "roman_to_integer",
+  "signature": "def roman_to_integer(s: str) -> Optional[int]:",
+  "docstring": "Convert a valid Roman numeral string to its integer representation.\nValid Roman symbols: I=1, V=5, X=10, L=50, C=100, D=500, M=1000.\nSubtractive notation: IV=4, IX=9, XL=40, XC=90, CD=400, CM=900.\nReturns integer value, or None if string contains invalid characters or is empty.",
+  "ref_implementation": "from typing import Optional\n\ndef roman_to_integer(s: str) -> Optional[int]:\n    if not isinstance(s, str) or not s:\n        return None\n    val_map = {'I': 1, 'V': 5, 'X': 10, 'L': 50, 'C': 100, 'D': 500, 'M': 1000}\n    total = 0\n    prev = 0\n    for char in reversed(s.upper()):\n        if char not in val_map:\n            return None\n        curr = val_map[char]\n        if curr < prev:\n            total -= curr\n        else:\n            total += curr\n        prev = curr\n    return total\n",
+  "golden_test": "def test_roman():\n    assert roman_to_integer('III') == 3\n    assert roman_to_integer('IV') == 4\n    assert roman_to_integer('IX') == 9\n    assert roman_to_integer('LVIII') == 58\n    assert roman_to_integer('MCMXCIV') == 1994\n    assert roman_to_integer('') is None\n    assert roman_to_integer('XYZ') is None\n\ntest_roman()\n",
+  "category": "Algorithms/Math",
+  "difficulty": "Easy",
+  "faulty_implementation": "from typing import Optional\n\ndef roman_to_integer(s: str) -> Optional[int]:\n    # Natural defect: Naive forward summation without handling subtractive pairs (e.g. IV becomes 1+5=6)\n    if not isinstance(s, str) or not s:\n        return None\n    val_map = {'I': 1, 'V': 5, 'X': 10, 'L': 50, 'C': 100, 'D': 500, 'M': 1000}\n    total = 0\n    for c in s.upper():\n        if c not in val_map:\n            return None\n        total += val_map[c]\n    return total\n",
+  "fault_type": "Subtractive Ignorance - Forward sum treats IV as 6 instead of 4",
+  "fault_generating_model": "Natural_Coder_Defect",
+  "metadata": {}
+}

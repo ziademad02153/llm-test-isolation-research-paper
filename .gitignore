@@ -1,0 +1,32 @@
+# Security & Environment variables
+.env
+*.env
+.env.*
+
+# Author private archive & submission records
+_author_records/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# System files & OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

@@ -1,0 +1,14 @@
+{
+  "problem_id": "TASK_010",
+  "function_name": "lru_cache_simulator",
+  "signature": "def lru_cache_simulator(capacity: int, operations: List[Tuple[str, str, Optional[str]]]) -> List[Optional[str]]:",
+  "docstring": "Simulate an LRU (Least Recently Used) cache with fixed capacity.\nArgs:\n    capacity: Maximum key-value pairs stored (must be > 0).\n    operations: List of tuples representing actions:\n        - ('GET', key, None) -> returns stored value or None if not found. Updates access order.\n        - ('PUT', key, value) -> inserts/updates key with value. Evicts least recently used if at capacity. Returns None.\nReturns:\n    List of results corresponding to each operation (None for PUT, value/None for GET).",
+  "ref_implementation": "from typing import List, Tuple, Optional\nfrom collections import OrderedDict\n\ndef lru_cache_simulator(capacity: int, operations: List[Tuple[str, str, Optional[str]]]) -> List[Optional[str]]:\n    cache = OrderedDict()\n    results = []\n    for op, key, val in operations:\n        if op == 'GET':\n            if key in cache:\n                cache.move_to_end(key)\n                results.append(cache[key])\n            else:\n                results.append(None)\n        elif op == 'PUT':\n            if key in cache:\n                cache[key] = val\n                cache.move_to_end(key)\n            else:\n                if len(cache) >= capacity:\n                    cache.popitem(last=False)\n                cache[key] = val\n            results.append(None)\n    return results\n",
+  "golden_test": "def test_lru():\n    ops = [\n        ('PUT', 'a', '1'),\n        ('PUT', 'b', '2'),\n        ('GET', 'a', None),\n        ('PUT', 'c', '3'), # 'b' evicted\n        ('GET', 'b', None),\n        ('GET', 'c', None),\n        ('GET', 'a', None)\n    ]\n    assert lru_cache_simulator(2, ops) == [None, None, '1', None, None, '3', '1']\n\ntest_lru()\n",
+  "category": "Data Structures",
+  "difficulty": "Medium",
+  "faulty_implementation": "from typing import List, Tuple, Optional\n\ndef lru_cache_simulator(capacity: int, operations: List[Tuple[str, str, Optional[str]]]) -> List[Optional[str]]:\n    # Natural defect: Regular dict without access refresh on GET, causing FIFO instead of LRU eviction\n    cache = {}\n    results = []\n    for op, key, val in operations:\n        if op == 'GET':\n            results.append(cache.get(key, None))\n        elif op == 'PUT':\n            if key not in cache and len(cache) >= capacity:\n                first_key = next(iter(cache))\n                del cache[first_key]\n            cache[key] = val\n            results.append(None)\n    return results\n",
+  "fault_type": "Cache Policy Drift - Implements FIFO instead of LRU (GET does not update recency)",
+  "fault_generating_model": "Natural_Coder_Defect",
+  "metadata": {}
+}

@@ -1,0 +1,14 @@
+{
+  "problem_id": "TASK_005",
+  "function_name": "validate_balanced_parentheses",
+  "signature": "def validate_balanced_parentheses(s: str) -> bool:",
+  "docstring": "Validate whether brackets in a string are balanced and properly nested.\nSupported bracket pairs are: '()', '[]', '{}'.\nNon-bracket characters are ignored.\nReturns True if all brackets are properly paired and closed in correct order, False otherwise.\nExample: 'a(b[c]d)e' -> True, '([)]' -> False, '{{}' -> False.",
+  "ref_implementation": "def validate_balanced_parentheses(s: str) -> bool:\n    if not isinstance(s, str):\n        return False\n    stack = []\n    mapping = {')': '(', ']': '[', '}': '{'}\n    opening = set(mapping.values())\n    for char in s:\n        if char in opening:\n            stack.append(char)\n        elif char in mapping:\n            if not stack or stack[-1] != mapping[char]:\n                return False\n            stack.pop()\n    return len(stack) == 0\n",
+  "golden_test": "def test_brackets():\n    assert validate_balanced_parentheses('') is True\n    assert validate_balanced_parentheses('()[]{}') is True\n    assert validate_balanced_parentheses('([{}])') is True\n    assert validate_balanced_parentheses('text (with [nested {brackets}]!)') is True\n    assert validate_balanced_parentheses('(]') is False\n    assert validate_balanced_parentheses('([)]') is False\n    assert validate_balanced_parentheses('(((') is False\n    assert validate_balanced_parentheses(')') is False\n\ntest_brackets()\n",
+  "category": "Parsing/Stack",
+  "difficulty": "Easy",
+  "faulty_implementation": "def validate_balanced_parentheses(s: str) -> bool:\n    # Natural defect: Counts bracket frequencies instead of enforcing stack order (fails on '([)]')\n    if not isinstance(s, str):\n        return False\n    return (s.count('(') == s.count(')') and\n            s.count('[') == s.count(']') and\n            s.count('{') == s.count('}'))\n",
+  "fault_type": "Structural/Stack Fallacy - Pure counting ignores interleaved nesting order",
+  "fault_generating_model": "Natural_Coder_Defect",
+  "metadata": {}
+}

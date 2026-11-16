@@ -1,0 +1,14 @@
+{
+  "problem_id": "TASK_008",
+  "function_name": "rate_limiter_sliding_window",
+  "signature": "def rate_limiter_sliding_window(history: List[float], new_timestamp: float, window_seconds: float, max_requests: int) -> Tuple[bool, List[float]]:",
+  "docstring": "Simulate a sliding window rate limiter check for an incoming request.\nArgs:\n    history: List of timestamps (in seconds) of previously admitted requests, assumed sorted.\n    new_timestamp: Timestamp of the candidate incoming request.\n    window_seconds: Duration of the sliding time window.\n    max_requests: Maximum allowed requests strictly within (new_timestamp - window_seconds, new_timestamp].\nReturns:\n    Tuple of (is_allowed: bool, updated_history: List[float]).\n    If allowed, updated_history includes new_timestamp and excludes expired timestamps outside the window.\n    If rejected, updated_history contains all valid timestamps within the window without new_timestamp.",
+  "ref_implementation": "from typing import List, Tuple\n\ndef rate_limiter_sliding_window(history: List[float], new_timestamp: float, window_seconds: float, max_requests: int) -> Tuple[bool, List[float]]:\n    cutoff = new_timestamp - window_seconds\n    valid_history = [ts for ts in history if ts > cutoff]\n    if len(valid_history) < max_requests:\n        valid_history.append(new_timestamp)\n        return True, valid_history\n    else:\n        return False, valid_history\n",
+  "golden_test": "def test_rate_limiter():\n    allowed, hist = rate_limiter_sliding_window([], 10.0, 60.0, 3)\n    assert allowed is True and hist == [10.0]\n    allowed, hist2 = rate_limiter_sliding_window([5.0, 8.0], 10.0, 60.0, 3)\n    assert allowed is True and hist2 == [5.0, 8.0, 10.0]\n    allowed, hist3 = rate_limiter_sliding_window([2.0, 5.0, 8.0], 10.0, 60.0, 3)\n    assert allowed is False and hist3 == [2.0, 5.0, 8.0]\n    # Expired events pruned\n    allowed, hist4 = rate_limiter_sliding_window([1.0, 2.0, 100.0], 105.0, 10.0, 2)\n    assert allowed is True and hist4 == [100.0, 105.0]\n\ntest_rate_limiter()\n",
+  "category": "State/Algorithms",
+  "difficulty": "Medium",
+  "faulty_implementation": "from typing import List, Tuple\n\ndef rate_limiter_sliding_window(history: List[float], new_timestamp: float, window_seconds: float, max_requests: int) -> Tuple[bool, List[float]]:\n    # Natural defect: Uses <= max_requests instead of < max_requests, allowing (max_requests + 1) requests\n    cutoff = new_timestamp - window_seconds\n    valid_history = [ts for ts in history if ts > cutoff]\n    if len(valid_history) <= max_requests:\n        valid_history.append(new_timestamp)\n        return True, valid_history\n    return False, valid_history\n",
+  "fault_type": "Capacity Off-by-One - Admits N+1 requests instead of capping strictly at N",
+  "fault_generating_model": "Natural_Coder_Defect",
+  "metadata": {}
+}
